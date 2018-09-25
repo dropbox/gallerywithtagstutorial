@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>                       
+  <script type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
+  <script src="/galleria/galleria-1.5.7.min.js"></script>
+  <script type='text/javascript' src='/javascripts/gallery.js'></script>
+  <link rel="stylesheet" href="/stylesheets/gallery.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+  <div class="topnav">
+    <span id="showing-results">{{showing_results}}</span>
+    <div class="search-container">
+      <form action="/gallery/search" id="form">
+        <input type="text" placeholder="Search.." name="search" id="query">
+        <button type="submit"><i class="fa fa-search"></i></button>
+      </form>
+    </div>
+  </div>
+  <div class="galleria">
+    {{#each imgs}}
+    <img src="{{this}}">
+    {{/each}}
+  </div>
+</body>
+</html>
