@@ -1338,7 +1338,8 @@ To force tagging all the files use this command:
 
 It will result into something like this (the waiting is because of the throttling):
 
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_249AE6AAE2B07641EC6EAA0EA7D8CBE1BFDF910A3A8E87363A2C116D4C03CA57_1533834025297_Screen+Shot+2018-08-09+at+10.00.03+AM.png)
+![](https://d2mxuefqeaa7sj.cloudfront.net/s_BD2583728F218B6FE5155D5429C5C779C824DC5A31A5759DDEA4E93A64F38E7F_1537936670187_Screen+Shot+2018-09-25+at+9.37.28+PM.png)
+
 
 ## Searching
 
