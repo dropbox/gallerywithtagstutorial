@@ -51,10 +51,54 @@ module.exports.gallery_continue = async (req,res,next)=>{
   }
 }  
 
-module.exports.search = async (req,res,next)=>{
-  res.send("not implemented");
+//Displays a gallery with search results
+module.exports.search = async (req, res, next)=>{
+  try{
+
+    if (typeof req.query.search == 'undefined'){
+      return next(new Error("no search arguments"));
+    }
+
+    let name = req.query.search.toLowerCase();
+
+    //Search for results with that name
+    let result = await dbxservices.searchPropertiesAsync(name);
+
+    //save cursor in local storage  
+    await store.setAsync(store.KEY_DBX_SEARCH_CURSOR,result.cursor);
+
+    let temporaryLinks = [];
+    let showing_results = "No results for: "+name;
+    if(result.paths.length>0){
+      //For all the paths returned, create temporarylinks
+      temporaryLinks = await dbxservices.getTemporaryLinksForPathsAsync(result.paths);
+      showing_results = "Showing results for: "+name;
+    }
+    res.render('gallery', { imgs: temporaryLinks, showing_results:showing_results, layout:false});
+  }catch(error){
+    return next(error);
+  }
 }
 
-module.exports.search_continue = async (req,res,next)=>{
-  res.send("not implemented");
-}
+//called to get the next set of results
+module.exports.search_continue = async (req, res, next)=>{
+  try{
+
+    let cursor = await store.getAsync(store.KEY_DBX_SEARCH_CURSOR);
+    if(!cursor)return res.send([]);//if no more results, return
+
+    let result = dbxservices.searchPropertiesFromCursorAsync(cursor);
+
+    //save cursor in local storage
+    await store.setAsync(store.KEY_DBX_SEARCH_CURSOR,result.cursor);
+
+    let temporaryLinks = [];
+    if(result.paths.length>0){
+      //For all the paths returned, create temporarylinks
+      temporaryLinks = await dbxservices.getTemporaryLinksForPathsAsync(result.paths);
+    }
+    res.send(temporaryLinks);
+  }catch(error){
+    res.status(500).send(error.message);
+  }
+}  
