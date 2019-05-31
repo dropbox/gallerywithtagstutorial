@@ -1,189 +1,146 @@
 /*
-This script helps to scale down images above a limit of bytes in a folder.
-To use it, change the parameters 
+This script scales down images above an specified size in a Dropbox folder
+and moves the larger original ones to a /highres folder in the same folder path
+To use it, change the following constants at your convenience
 FOLDER_PATH 
 LIMIT_SIZE (in bytes)
 
-and run using this command:
+and run using the following command:
 node -e 'require("./scaledownimgscript").run()'
-
 */
-
 
 //token will be read from .env file
 require('dotenv').config({silent: true});
 
-//Dropbox SDK requires this line
-require('isomorphic-fetch'); 
-const Dropbox = require('dropbox').Dropbox;
-
-//Folder in Dropbox for images to be resampled
+// Folder in Dropbox for images to be scaled down
 const FOLDER_PATH = '/photos';
 
-//Results per each pagination event in Dropbox
+// Number of results when listing files from Dropbox
 const PAGINATION_SIZE = 20;
 
-//Anything beyond this limit will be resized to the options below
-const LIMIT_SIZE = 6000000;
+// Anything beyond this limit will be resized according to options below
+const LIMIT_SIZE = 6000000;  // in bytes
+
+// Parameters to configure the thumbnail download
+const FORMAT = 'jpeg';
+const SIZE = 'w2048h1536';
+const MODE = 'fitone_bestfit';
+
+// Initialization of Dropbox SDK
+const
+Dropbox = require('dropbox').Dropbox,
+fetch = require('isomorphic-fetch'),
+config = {
+  fetch: fetch,
+  accessToken: process.env.DBX_TOKEN
+};
+var dbx = new Dropbox(config);
 
 
-//Options to download an scaled down version of the images in the FOLDER_PATH
-//https://www.dropbox.com/developers/documentation/http/documentation#files-get_thumbnail
-var download_params = {
-  format: 'jpeg',
-  size : 'w2048h1536',
-  mode: 'bestfit'
-}
-
-var upload_params = {
-  autorename: true,
-  mute: true
-}
-
-
-//Scales down all the images in the FOLDER_PATH
+// Entry point for the script
 module.exports.run = async () =>{
   try{
 
-    let dbx = new Dropbox({ accessToken: process.env.DBX_TOKEN});
-
-    let cursor = false;
     let has_more = true;
-    let counter = 0;
+    let cursor = null;
+    let counter = 0;     // keeps track of number of imgs resized 
 
     while(has_more){
 
-      let result= null;
+      let files_list;
 
-      if(!cursor){
-        result = await imgsOverSizeInFolder(dbx);
+      // Get the next page of files from Dropbox
+      if(!cursor){ 
+        let params = { path: FOLDER_PATH, limit: PAGINATION_SIZE };
+        files_list = await dbx.filesListFolder(params);
+
       }else{
-        result = await imgsOverSizeForCursor(dbx, cursor);
+        files_list = await dbx.filesListFolderContinue({cursor:cursor});
       }
 
-      cursor = result.cursor;
-      has_more = result.has_more;
+      cursor = files_list.cursor;
+      has_more = files_list.has_more;
 
+      let imgs_paths = filterOverSizedImgsInDropboxResult(files_list.entries);
 
-      for(let i = 0; i < result.imgPaths.length; i++){
+      for(let i = 0; i < imgs_paths.length; i++){
 
-        let path = result.imgPaths[i];
+        let path = imgs_paths[i];
 
-        //donwloads a lower resolution version of the file
-        download_params.path = path;
-        let response = await dbx.filesGetThumbnail(download_params);
+        //1. donwload a lower resolution version of the file
+        let thumbnail = await downloadThumbnailAsync(path);
 
-        console.log("downloaded lower res image");
+        //2. upload the lowres file to Dropbox in the same folder
+        let upload_response = await uploadFileAsync(path, thumbnail.fileBinary);
 
-        //uploads the file to Dropbox in the same folder
-        //the picture will be added the _lowres sufix
-        upload_params.contents = response.fileBinary;
-        upload_params.path = path.substr(0, path.lastIndexOf('.')) + '_lowres.jpg';
+        //3. move original file to a /highres folder within the folder of origin
+        await moveFileAsync(path);
 
-        response = await dbx.filesUpload(upload_params);
-
-        console.log("uploaded new image as "+ upload_params.path);
-
-        //moves original file to a /highres folder within the folder of origin
-        let move_params = {};
-        move_params.from_path = path;
-        //regex for the last / in the path
-        move_params.to_path = path.replace(/\/(?!.*\/)/, "/highres/");
-        move_params.autorename = true;
-        response = await dbx.filesMoveV2(move_params);
-
-        console.log(path + " moved to " + response.metadata.path_lower);
+        console.log('resized and moved ' + path);
 
         counter++;
-
       } 
     }
 
-    console.log("Finished resizing " + counter + " images");
+    console.log("Finished! Resized " + counter + " images");
     
   }catch(error){
+    console.log('!! Encountered error, aborting');
     console.log(error);
   }
-  console.log("-> Script finished.  Use Ctrl+C to return to terminal");
 }
 
+//Filters an array of entries returning only the paths to imgages
+function filterOverSizedImgsInDropboxResult(entries){
 
-async function imgsOverSizeInFolder(dbx){
-  try{   
-
-    let params = {};
-    params.path = FOLDER_PATH;
-    params.limit = PAGINATION_SIZE;
-
-    let result = await dbx.filesListFolder(params);
-    let returnValue = await filterDropboxResultAsync(result);
-
-    return returnValue;
-
-  }catch(error){
-    throw(new Error("couldnt get paths for images in folder. " + getDbxErrorMsg(error)));
+  let imgs_paths = [];
+  for(let i = 0; i < entries.length; i++) {
+    entry = entries[i];
+    if(entry.path_lower.search(/\.(gif|jpg|jpeg|tiff|png)$/i) == -1) continue;
+    if(entry.size > LIMIT_SIZE ){
+      imgs_paths.push(entry.path_lower);
+    }
   }
+
+  return imgs_paths;
 }
 
-async function imgsOverSizeForCursor(dbx,cursor){
-  try{  
+// Downloads a thumbnail from Dropbox for a given path
+async function downloadThumbnailAsync(path){
 
-    let result = await dbx.filesListFolderContinue({"cursor":cursor});
-    let returnValue = await filterDropboxResultAsync(result);
-    
-    return returnValue;
-    
-  }catch(error){
-    throw(new Error("couldnt get paths for images with cursor. " + getDbxErrorMsg(error)));
+  let download_params = { 
+    path: path,
+    format: FORMAT, 
+    size: SIZE, 
+    mode: MODE 
   }
+
+  return dbx.filesGetThumbnail(download_params);
 }
 
-async function filterDropboxResultAsync(result){
-  try{
+// Uploads a file in Dropbox in a given path
+async function uploadFileAsync(path,fileBinary){
 
-    let returnValue = {};
-
-    //Get cursor to fetch more pictures
-    returnValue.cursor = result.cursor;
-    returnValue.has_more = result.has_more;
-
-    //Filter result to images only
-    let entriesFiltered = result.entries.filter(function(entry){
-      return entry.path_lower.search(/\.(gif|jpg|jpeg|tiff|png)$/i) > -1;
-    });  
-
-    //Filter result to files bigger than limit size
-    entriesFiltered = result.entries.filter(function(entry){
-      return entry.size > LIMIT_SIZE;
-    });  
-
-    //Get an array from the entries with only the path_lower fields
-    let imgPaths = entriesFiltered.map(function (entry) {
-      return entry.path_lower;
-    });
-
-    returnValue.imgPaths = imgPaths;
-
-    return returnValue;
-
-  }catch(error){
-    throw(new Error("couldnt filter result. " + getDbxErrorMsg(error)));
+  let upload_params = {
+    //the picture will be added the _lowres sufix
+    path : path.substr(0, path.lastIndexOf('.')) + '_lowres.jpg',
+    contents : fileBinary,
+    autorename: true,
+    mute: true
   }
+
+  return dbx.filesUpload(upload_params);
 }
 
-//Gets an error message from an error potentially comming from Dropbox
-function getDbxErrorMsg(error){
-  if(typeof error.message == 'string'){
-    return error.message;
-  }
-  else if(typeof error.error == 'string'){
-    return error.error;
-  }
-  else if (typeof error.error.error_summary == 'string'){
-    return error.error.error_summary;
-  }else{
-    return null;
-  }
+// Moves an image to a /highres folder within the original folder
+async function moveFileAsync(path){
+
+  let move_params = {
+    from_path : path,
+    //regex for the last / in the path
+    to_path : path.replace(/\/(?!.*\/)/, "/highres/"),
+    autorename : true
+  };
+
+  return dbx.filesMoveV2(move_params);
 }
-
-
