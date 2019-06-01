@@ -1,16 +1,19 @@
 /*
 This script scales down images above an specified size in a Dropbox folder
 and moves the larger original ones to a /highres folder in the same folder path
+
 To use it, change the following constants at your convenience
+DROPBOX_ACCESS_TOKEN  // Needs to have access to the FOLDER_PATH
 FOLDER_PATH 
 LIMIT_SIZE (in bytes)
+FORMAT,SIZE,MODE can be any of the options in the get_thumbnail documentation
 
-and run using the following command:
+and run using the following two commands:
+npm install dropbox isomorphic-fetch
 node -e 'require("./scaledownimgscript").run()'
 */
 
-//token will be read from .env file
-require('dotenv').config({silent: true});
+const DROPBOX_ACCESS_TOKEN = '<ENTER HERE A DROPBOX ACCESS TOKEN>';
 
 // Folder in Dropbox for images to be scaled down
 const FOLDER_PATH = '/photos';
@@ -32,7 +35,7 @@ Dropbox = require('dropbox').Dropbox,
 fetch = require('isomorphic-fetch'),
 config = {
   fetch: fetch,
-  accessToken: process.env.DBX_TOKEN
+  accessToken: DROPBOX_ACCESS_TOKEN
 };
 var dbx = new Dropbox(config);
 
