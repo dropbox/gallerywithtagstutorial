@@ -70,7 +70,7 @@ module.exports.run = async () =>{
 
         let path = imgs_paths[i];
 
-        //1. donwload a lower resolution version of the file
+        //1. download a lower resolution version of the file
         let thumbnail = await downloadThumbnailAsync(path);
 
         //2. upload the lowres file to Dropbox in the same folder
@@ -93,7 +93,7 @@ module.exports.run = async () =>{
   }
 }
 
-//Filters an array of entries returning only the paths to imgages
+//Filters an array of entries returning only the paths for the oversized images
 function filterOverSizedImgsInDropboxResult(entries){
 
   let imgs_paths = [];
