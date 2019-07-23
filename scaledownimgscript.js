@@ -1,16 +1,14 @@
 /*
-This script scales down images above an specified size in a Dropbox folder
-and moves the larger original ones to a /highres folder in the same folder path
-
-To use it, change the following constants at your convenience
+This script creates scaled down versions of images that are above an specified size in 
+a Dropbox folder and moves the larger original ones to a /highres folder in the same 
+directory. To use it, change the following constants at your convenience:
 DROPBOX_ACCESS_TOKEN  // Needs to have access to the FOLDER_PATH
 FOLDER_PATH 
 LIMIT_SIZE (in bytes)
-FORMAT,SIZE,MODE can be any of the options in the get_thumbnail documentation
-
-and run using the following two commands:
-npm install dropbox isomorphic-fetch
-node -e 'require("./scaledownimgscript").run()'
+FORMAT, SIZE, MODE can be any of the predefined options in the get_thumbnail documentation.
+Run using the following two commands in the directory with the script:
+1. npm install dropbox isomorphic-fetch
+2. node -e 'require("./scaledownimgscript").run()'
 */
 
 const DROPBOX_ACCESS_TOKEN = '<ENTER HERE A DROPBOX ACCESS TOKEN>';
@@ -21,8 +19,8 @@ const FOLDER_PATH = '/photos';
 // Number of results when listing files from Dropbox
 const PAGINATION_SIZE = 20;
 
-// Anything beyond this limit will be resized according to options below
-const LIMIT_SIZE = 6000000;  // in bytes
+// Anything above this size limit will be resized according to options below
+const LIMIT_SIZE = 5000000;  // in bytes
 
 // Parameters to configure the thumbnail download
 const FORMAT = 'jpeg';
@@ -93,7 +91,7 @@ module.exports.run = async () =>{
   }
 }
 
-//Filters an array of entries returning only the paths for the oversized images
+// Filters an array of entries returning only the paths for the oversized images
 function filterOverSizedImgsInDropboxResult(entries){
 
   let imgs_paths = [];
@@ -109,7 +107,7 @@ function filterOverSizedImgsInDropboxResult(entries){
 }
 
 // Downloads a thumbnail from Dropbox for a given path
-async function downloadThumbnailAsync(path){
+function downloadThumbnailAsync(path){
 
   let download_params = { 
     path: path,
@@ -122,10 +120,10 @@ async function downloadThumbnailAsync(path){
 }
 
 // Uploads a file in Dropbox in a given path
-async function uploadFileAsync(path,fileBinary){
+function uploadFileAsync(path,fileBinary){
 
   let upload_params = {
-    //the picture will be added the _lowres sufix
+    //the picture will be added the _lowres suffix
     path : path.substr(0, path.lastIndexOf('.')) + '_lowres.jpg',
     contents : fileBinary,
     autorename: true,
@@ -135,8 +133,8 @@ async function uploadFileAsync(path,fileBinary){
   return dbx.filesUpload(upload_params);
 }
 
-// Moves an image to a /highres folder within the original folder
-async function moveFileAsync(path){
+// Moves source images to a /highres folder within the original directory
+function moveFileAsync(path){
 
   let move_params = {
     from_path : path,
